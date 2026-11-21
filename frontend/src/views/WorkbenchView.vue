@@ -12,6 +12,22 @@
         <button class="btn" data-testid="export" type="button" @click="exportRows">
           导出{{ meta.name }}清单
         </button>
+        <RouterLink
+          v-if="meta.key === 'data_lineage'"
+          class="btn"
+          data-testid="open-lineage-exchange"
+          to="/data_lineage/exchange"
+        >
+          跨系统交接
+        </RouterLink>
+        <RouterLink
+          v-if="meta.key === 'query_scheduler'"
+          class="btn"
+          data-testid="open-scheduler-detail"
+          to="/query_scheduler/detail"
+        >
+          调度详情
+        </RouterLink>
       </div>
     </header>
 
@@ -50,6 +66,14 @@
           <td v-for="column in meta.fields" :key="column">{{ row[column] ?? '—' }}</td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
+            <RouterLink
+              v-if="meta.key === 'query_scheduler'"
+              class="link"
+              :data-testid="`detail-${row.id}`"
+              :to="`/query_scheduler/${row.id}`"
+            >
+              详情
+            </RouterLink>
             <button
               v-for="action in meta.actions"
               :key="action"
@@ -95,6 +119,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import {
   createEntry,

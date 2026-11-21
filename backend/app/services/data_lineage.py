@@ -6,13 +6,17 @@ from typing import Any
 from app.services.base import BaseModuleService
 from app.store import store
 from app.analytics_engine import LineageGraph, LineageNode
+from app.services.lineage_exchange import lineage_exchange
 
 
 class DataLineageService(BaseModuleService):
     MODULE = "data_lineage"
     ENTITY = "血缘节点"
     OPERATION_TERM = "校验"
-    LIST_FIELDS = ["节点名称", "节点类型", "上游列表", "下游列表", "数据量级", "更新频率", "负责人"]
+    LIST_FIELDS = [
+        "节点名称", "节点类型", "上游列表", "下游列表", "事实表", "来源系统",
+        "分区字段", "分区列表", "数据量级", "更新频率", "负责人",
+    ]
     REQUIRED_FIELDS = ["节点名称", "节点类型", "上游列表"]
     STATUS_ORDER = ["在线", "已下线", "已停用"]
     ACTION_RULES = {"标记下线": "已下线", "停用节点": "已停用"}
@@ -103,6 +107,25 @@ class DataLineageService(BaseModuleService):
             "node_count": len(adj["nodes"]),
             **adj,
         }
+
+    # ---- 跨系统交接 ----
+
+    def export_handoff(self, node_ids: list[int] | None = None) -> dict[str, Any]:
+        """按血缘节点导出交接文件，记下事实表出处和前驱节点键。"""
+        return lineage_exchange.export_nodes(node_ids)
+
+    def import_handoff(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """接收交接文件：核对事实表出处、映射节点、落图版本。"""
+        return lineage_exchange.import_exchange(payload)
+
+    def list_exchange_versions(self) -> dict[str, Any]:
+        return lineage_exchange.list_versions()
+
+    def get_exchange_version(self, version_id: str) -> dict[str, Any]:
+        return lineage_exchange.get_version(version_id)
+
+    def sample_handoff(self, kind: str = "conflict") -> dict[str, Any]:
+        return lineage_exchange.sample_file(kind)
 
     def domain_snapshot(self) -> dict[str, Any]:
         base = super().domain_snapshot()

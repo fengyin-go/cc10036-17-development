@@ -63,11 +63,33 @@ npm run dev
 | 查询加速 | `query_accelerator` | 加速配置 | 配置名称、目标查询、加速方式 |
 | 归因模型 | `attribution_model` | 归因配置 | 模型名称、归因对象、归因窗口 |
 | 同期群分析 | `cohort_analysis` | 群组配置 | 群组名称、初始事件、回访事件 |
-| 数据血缘 | `data_lineage` | 血缘节点 | 节点名称、节点类型、上游列表 |
-| 查询调度 | `query_scheduler` | 调度计划 | 计划名称、查询语句、执行周期 |
+| 数据血缘 | `data_lineage` | 血缘节点 | 节点名称、节点类型、上游列表、事实表、来源系统 |
+| 查询调度 | `query_scheduler` | 调度计划 | 计划名称、查询语句、执行周期、前驱节点 |
 | 结果缓存 | `result_cache` | 缓存条目 | 缓存键、查询描述、结果行数 |
 | 数据范围 | `olap_scope` | 范围规则 | 规则名称、数据范围、授权对象 |
 | 实验分析 | `ab_analysis` | 实验配置 | 实验名称、对照组、实验组 |
+
+## 跨系统血缘交接
+
+血缘图需要在不同系统之间复算，`data_lineage` 支持按节点导出交接文件并在目标端载入：
+
+1. 导出：`GET /api/lineage/exchange/export?node_ids=3,10,11`，文件里每个节点记下
+   事实表出处（`fact_table` + `fact_origin`）和前驱节点键（`predecessors`）。
+   留空 `node_ids` 导出全部在线节点；`GET /api/lineage/exchange/sample?kind=conflict`
+   可生成三节点示例（一张订单日表与本地重合，另一张同名表来自外域）。
+2. 载入：`POST /api/lineage/exchange/import`，先按事实表出处核对再映射节点：
+   - 本地重合 / 外域已存在：复用已有节点；
+   - 同名异源：按出处分别保留，不并入本地同名节点，并记入冲突清单；
+   - 前驱键本地无法解析：记入 `missing_edges`，图版本状态为「待补齐」。
+3. 同一文件（摘要相同）并发载入只生成一个图版本，后到请求返回 `duplicate: true`。
+   `GET /api/lineage/exchange/versions` 列出所有版本，`{version_id}` 查看明细。
+4. 调度详情 `GET /api/scheduler/{plan_id}/detail` 与
+   `GET /api/scheduler/{plan_id}/partition-scope` 只用核过的前置关系推导分区刷新范围；
+   仍缺边或出处待核时 `ready` 为 `false`，并在 `blockers` 中说明原因，
+   `GET /api/scheduler/ready` 不会把这些计划当成就绪。
+   计划 `血缘引用` 记录引用的图版本、引用类型（旧计划引用 / 新计划上游依赖）和由来。
+
+前端入口：数据血缘页「跨系统交接」、查询调度页「调度详情」。
 
 ## 约定
 
